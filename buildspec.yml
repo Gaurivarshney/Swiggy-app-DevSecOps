@@ -2,8 +2,8 @@ version: 0.2
 
 env:
   variables:
-    AWS_DEFAULT_REGION: ap-south-1        # ✅ change this to your AWS region
-    REPOSITORY_NAME: swiggy-backend       # ✅ change this to your ECR repo name
+    AWS_DEFAULT_REGION: ap-south-1        # Change to your AWS region
+    REPOSITORY_NAME: swiggy-backend       # Change to your ECR repo name
 
 phases:
   install:
