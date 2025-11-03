@@ -2,8 +2,8 @@ version: 0.2
 
 env:
   variables:
-    AWS_DEFAULT_REGION: "ap-south-1"       # Change to your AWS region
-    REPOSITORY_NAME: "swiggy-backend"      # Change to your ECR repo name
+    AWS_DEFAULT_REGION: "eu-north-1"
+    REPOSITORY_NAME: "swiggy-registery"
 
 phases:
   install:
@@ -30,9 +30,9 @@ phases:
 
   post_build:
     commands:
-      - echo "Pushing image to Amazon ECR..."
+      - echo "Pushing Docker image to ECR..."
       - docker push "$REPOSITORY_URI:$IMAGE_TAG"
-      - echo "Writing image details to artifact..."
+      - echo "Creating imageDetail.json artifact..."
       - printf '{"ImageURI":"%s"}' "$REPOSITORY_URI:$IMAGE_TAG" > imageDetail.json
       - echo "Build completed successfully!"
 
