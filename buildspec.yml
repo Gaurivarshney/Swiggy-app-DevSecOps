@@ -1,0 +1,41 @@
+version: 0.2
+
+env:
+  variables:
+    AWS_DEFAULT_REGION: ap-south-1        # ✅ change this to your AWS region
+    REPOSITORY_NAME: swiggy-backend       # ✅ change this to your ECR repo name
+
+phases:
+  install:
+    runtime-versions:
+      docker: 20
+    commands:
+      - echo "Starting build process..."
+      - echo "Ensuring Docker is ready to build the image."
+
+  pre_build:
+    commands:
+      - echo "Logging in to Amazon ECR..."
+      - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - REPOSITORY_URI=$ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPOSITORY_NAME
+      - echo "Repository URI: $REPOSITORY_URI"
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - echo "Image tag: $IMAGE_TAG"
+
+  build:
+    commands:
+      - echo "Building Docker image using Dockerfile from GitHub repo..."
+      - docker build -t $REPOSITORY_URI:$IMAGE_TAG .
+
+  post_build:
+    commands:
+      - echo "Pushing image to Amazon ECR..."
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - echo "Writing image details to artifact..."
+      - printf '{"ImageURI":"%s"}' $REPOSITORY_URI:$IMAGE_TAG > imageDetail.json
+      - echo "Build completed successfully!"
+
+artifacts:
+  files:
+    - imageDetail.json
