@@ -3,7 +3,6 @@ version: 0.2
 env:
   variables:
     AWS_DEFAULT_REGION: eu-north-1
-    AWS_ACCOUNT_ID: !Sub ${AWS::AccountId}
     IMAGE_REPO_NAME: swiggy-registery
     IMAGE_TAG: latest
     BUCKET_NAME: cicdpipeline22
@@ -13,7 +12,8 @@ phases:
     commands:
       - echo Logging in to Amazon ECR...
       - aws --version
-      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - $(aws ecr get-login --region $AWS_DEFAULT_REGION --no-include-email)
+      - AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
       - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - IMAGE_TAG=${COMMIT_HASH:=latest}
@@ -23,7 +23,6 @@ phases:
   install:
     runtime-versions:
       nodejs: 18
-      docker: 20
     commands:
       - echo Install phase started on `date`
       - echo Installing dependencies...
