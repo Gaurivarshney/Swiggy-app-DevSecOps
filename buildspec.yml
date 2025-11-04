@@ -2,40 +2,62 @@ version: 0.2
 
 env:
   variables:
-    AWS_DEFAULT_REGION: "eu-north-1"
-    REPOSITORY_NAME: "swiggy-registery"
+    AWS_DEFAULT_REGION: eu-north-1
+    AWS_ACCOUNT_ID: !Sub ${AWS::AccountId}
+    IMAGE_REPO_NAME: swiggy-registery
+    IMAGE_TAG: latest
+    BUCKET_NAME: cicdpipeline22
 
 phases:
-  install:
-    runtime-versions:
-      docker: 20
-    commands:
-      - echo "Starting build process..."
-      - echo "Ensuring Docker is ready to build the image."
-
   pre_build:
     commands:
-      - echo "Logging in to Amazon ECR..."
-      - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-      - REPOSITORY_URI="$ACCOUNT_ID.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${REPOSITORY_NAME}"
-      - echo "Repository URI: $REPOSITORY_URI"
-      - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$ACCOUNT_ID.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
-      - IMAGE_TAG=$(echo "$CODEBUILD_RESOLVED_SOURCE_VERSION" | cut -c 1-7)
-      - echo "Image tag: $IMAGE_TAG"
+      - echo Logging in to Amazon ECR...
+      - aws --version
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH:=latest}
+      - echo Repository URI is $REPOSITORY_URI
+      - echo Image tag is $IMAGE_TAG
+
+  install:
+    runtime-versions:
+      nodejs: 18
+      docker: 20
+    commands:
+      - echo Install phase started on `date`
+      - echo Installing dependencies...
+      - npm install
 
   build:
     commands:
-      - echo "Building Docker image using Dockerfile from GitHub repo..."
-      - docker build -t "$REPOSITORY_URI:$IMAGE_TAG" .
+      - echo Build phase started on `date`
+      - echo Building the React application...
+      - npm run build
+      - echo Build completed on `date`
+      - echo Building the Docker image...
+      - docker build -t $IMAGE_REPO_NAME:$IMAGE_TAG .
+      - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $REPOSITORY_URI:$IMAGE_TAG
+      - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $REPOSITORY_URI:latest
 
   post_build:
     commands:
-      - echo "Pushing Docker image to ECR..."
-      - docker push "$REPOSITORY_URI:$IMAGE_TAG"
-      - echo "Creating imageDetail.json artifact..."
-      - printf '{"ImageURI":"%s"}' "$REPOSITORY_URI:$IMAGE_TAG" > imageDetail.json
-      - echo "Build completed successfully!"
+      - echo Post build phase started on `date`
+      - echo Pushing the Docker images...
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - docker push $REPOSITORY_URI:latest
+      - echo Writing image definitions file...
+      - printf '[{"name":"swiggy-app","imageUri":"%s"}]' $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
+      - echo Build completed on `date`
 
 artifacts:
   files:
-    - imageDetail.json
+    - imagedefinitions.json
+    - '**/*'
+  base-directory: '.'
+  name: swiggy-app-$(date +%Y-%m-%d)
+
+cache:
+  paths:
+    - '/root/.npm/**/*'
+    - 'node_modules/**/*'
